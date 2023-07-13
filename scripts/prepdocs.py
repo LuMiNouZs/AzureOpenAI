@@ -31,6 +31,7 @@ parser.add_argument("--storagekey", required=False, help="Optional. Use this Azu
 parser.add_argument("--tenantid", required=False, help="Optional. Use this to define the Azure directory where to authenticate)")
 parser.add_argument("--searchservice", help="Name of the Azure Cognitive Search service where content should be indexed (must exist already)")
 parser.add_argument("--index", help="Name of the Azure Cognitive Search index where content should be indexed (will be created if it doesn't exist)")
+parser.add_argument("--index_category", help="Name of the Azure Cognitive Search index Category where content should be indexed (will be created if it doesn't exist)")
 parser.add_argument("--searchkey", required=False, help="Optional. Use this Azure Cognitive Search account key instead of the current user identity to login (use az login to set current user for Azure)")
 parser.add_argument("--remove", action="store_true", help="Remove references to this document from blob storage and the search index")
 parser.add_argument("--removeall", action="store_true", help="Remove all blobs from blob storage and documents from the search index")
@@ -220,12 +221,13 @@ def split_text(page_map):
     if start + SECTION_OVERLAP < end:
         yield (all_text[start:end], find_page(start))
 
-def create_sections(filename, page_map):
+def create_sections(filename, page_map,category):
     for i, (section, pagenum) in enumerate(split_text(page_map)):
         yield {
             "id": re.sub("[^0-9a-zA-Z_-]","_",f"{filename}-{i}"),
             "content": section,
-            "category": args.category,
+            #"category": args.category,
+            "category": category,
             "sourcepage": blob_name_from_file_page(filename, pagenum),
             "sourcefile": filename
         }
@@ -290,7 +292,7 @@ def remove_from_index(filename):
         if args.verbose: print(f"\tRemoved {len(r)} sections from index")
         # It can take a few seconds for search results to reflect changes, so wait a bit
         time.sleep(2)
-"""
+
 if args.removeall:
     remove_blobs(None)
     remove_from_index(None)
@@ -298,8 +300,8 @@ else:
     if not args.remove:
         create_search_index()
     
-    print(f"Processing files...")
-    for filename in glob.glob(args.files):
+    print(f"Processing files...folder 1")
+    for filename in glob.glob('./data/Marine/*'):
         if args.verbose: print(f"Processing '{filename}'")
         if args.remove:
             remove_blobs(filename)
@@ -311,8 +313,26 @@ else:
             if not args.skipblobs:
                 upload_blobs(filename)
             page_map = get_document_text(filename)
-            sections = create_sections(os.path.basename(filename), page_map)
+            category = 'Marine'
+            sections = create_sections(os.path.basename(filename), page_map, category)
             index_sections(os.path.basename(filename), sections)
-"""
+
+    print(f"Processing files...folder 2")
+    for filename in glob.glob('./data/Intellectual Capital/*'):
+        if args.verbose: print(f"Processing '{filename}'")
+        if args.remove:
+            remove_blobs(filename)
+            remove_from_index(filename)
+        elif args.removeall:
+            remove_blobs(None)
+            remove_from_index(None)
+        else:
+            if not args.skipblobs:
+                upload_blobs(filename)
+            page_map = get_document_text(filename)
+            category = 'Intellectual Capital'
+            sections = create_sections(os.path.basename(filename), page_map, category)
+            index_sections(os.path.basename(filename), sections)
+
 filename =""
 print(args)
